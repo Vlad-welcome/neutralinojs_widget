@@ -139,4 +139,11 @@ Neutralino.events.on("ready", async () => {
         break;
     }
   });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      Neutralino.app.exit();
+    }
+  });
 });
