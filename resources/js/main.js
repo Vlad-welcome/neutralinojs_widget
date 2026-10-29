@@ -92,21 +92,60 @@ Neutralino.events.on("ready", async () => {
   });
 
   widget.addEventListener("dblclick", (e) => {
-    if (e.button !== 0) return;
+    if (e.button === 0) {
+      //включение зацикливание анимации
+      console.log("double left");
+      if (stopTimer) {
+        clearTimeout(stopTimer);
+        stopTimer = null;
+      }
 
-    if (stopTimer) {
-      clearTimeout(stopTimer);
-      stopTimer = null;
+      isRepeating = true;
+      picture.src = img[1];
     }
-
-    isRepeating = true;
-    picture.src = img[1];
-    console.log("double");
   });
 
-  // 5. Отключаем стандартное контекстное меню
-  widget.addEventListener("contextmenu", (e) => {
+  let lastRightClickTime = 0;
+  let lastRightClickX = 0;
+  let lastRightClickY = 0;
+
+  const DOUBLE_CLICK_DELAY = 200; // мс между кликами
+  const POSITION_TOLERANCE = 20; // пикселей
+
+  // 5. Открытие VSCode
+  widget.addEventListener("contextmenu", async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    const now = Date.now();
+    const dx = Math.abs(e.clientX - lastRightClickX);
+    const dy = Math.abs(e.clientY - lastRightClickY);
+    const isNearby = dx <= POSITION_TOLERANCE && dy <= POSITION_TOLERANCE;
+    const isFast = now - lastRightClickTime <= DOUBLE_CLICK_DELAY;
+
+    // === Сработал двойной правый клик ===
+    if (isFast && isNearby) {
+      lastRightClickTime = 0;
+      console.log("double right");
+      try {
+        const folderPath = await Neutralino.os.showFolderDialog(
+          "Выберите папку для открытия в VS Code",
+        );
+        if (folderPath) {
+          // Папка выбрана, запускаем VS Code
+          await Neutralino.os.execCommand(`code "${folderPath}"`, { background: true });
+          console.log(`VS Code запущен для папки: ${folderPath}`);
+        } else {
+          console.log("Выбор папки отменён.");
+        }
+      } catch (error) {
+        console.error("Ошибка при выборе папки или запуске VS Code:", error);
+      }
+    } else {
+      lastRightClickTime = now;
+      lastRightClickX = e.clientX;
+      lastRightClickY = e.clientY;
+    }
   });
 
   async function createTray() {
@@ -145,5 +184,10 @@ Neutralino.events.on("ready", async () => {
       event.preventDefault();
       Neutralino.app.exit();
     }
+  });
+
+  Neutralino.events.on("serverOffline", () => {
+    console.log("Server offline — closing app");
+    Neutralino.app.exit();
   });
 });
